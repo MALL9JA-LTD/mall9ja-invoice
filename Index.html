@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mall9ja Invoice Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .preview-controls {
+            max-width: 800px;
+            margin: 0 auto 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .preview-controls button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .btn-download { background-color: #5B2D8E; color: white; }
+        .btn-download:hover { background-color: #4a2475; }
+        .btn-add { background-color: #10B981; color: white; }
+        .btn-add:hover { background-color: #059669; }
+        .btn-reset { background-color: #6B7280; color: white; }
+        .btn-reset:hover { background-color: #4B5563; }
+        .edit-mode-notice {
+            background: #FEF3C7;
+            border: 2px solid #F5B72E;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-left: auto;
+            font-size: 13px;
+            color: #92400E;
+        }
+        .invoice-preview {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .invoice-header {
+            background: linear-gradient(135deg, #5B2D8E 0%, #3D1A6D 100%);
+            padding: 30px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .invoice-header h1 { color: white; font-size: 32px; font-weight: 700; letter-spacing: 2px; }
+        .invoice-header p { color: rgba(255,255,255,0.9); margin-top: 8px; font-size: 16px; }
+        .invoice-body { padding: 30px 40px; }
+        .invoice-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .invoice-details > div {
+            flex: 1;
+            min-width: 200px;
+        }
+        .invoice-details h4 {
+            color: #5B2D8E;
+            margin: 0 0 12px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .invoice-details p { margin: 4px 0; color: #666; }
+        .invoice-details p.name { font-weight: 600; font-size: 16px; color: #333; }
+        
+        /* Editable field styles */
+        .editable {
+            border: 1px dashed transparent;
+            padding: 2px 6px;
+            margin: -2px -6px;
+            border-radius: 4px;
+            min-width: 60px;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+        .editable:hover {
+            border-color: #5B2D8E;
+            background-color: #f8f5fc;
+        }
+        .editable:focus {
+            outline: none;
+            border-color: #5B2D8E;
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(91, 45, 142, 0.1);
+        }
+        .editable-input {
+            border: 1px dashed transparent;
+            padding: 2px 6px;
+            font-family: inherit;
+            font-size: inherit;
+            color: inherit;
+            background: transparent;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .editable-input:hover {
+            border-color: #5B2D8E;
+            background-color: #f8f5fc;
+        }
+        .editable-input:focus {
+            outline: none;
+            border-color: #5B2D8E;
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(91, 45, 142, 0.1);
+        }
+        .invoice-number-input {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.9);
+            font-size: 16px;
+            font-family: inherit;
+            text-align: right;
+            width: 150px;
+            border-bottom: 1px dashed rgba(255,255,255,0.5);
+        }
+        .invoice-number-input:focus {
+            outline: none;
+            border-bottom-color: #F5B72E;
+        }
+        
+        .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .invoice-table th {
+            background-color: #5B2D8E;
+            color: white;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .invoice-table th:nth-child(2) { text-align: center; width: 100px; }
+        .invoice-table th:nth-child(3) { text-align: right; width: 180px; }
+        .invoice-table td { padding: 14px 16px; border-bottom: 1px solid #eee; vertical-align: top; }
+        .invoice-table td:nth-child(2) { text-align: center; }
+        .invoice-table td:nth-child(3) { text-align: right; font-weight: 600; }
+        .invoice-table .product-name-input {
+            width: 100%;
+            font-weight: 600;
+        }
+        .invoice-table .product-desc-input {
+            width: 100%;
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .invoice-table .qty-input {
+            width: 50px;
+            text-align: center;
+        }
+        .invoice-table .amount-input {
+            width: 140px;
+            text-align: right;
+            font-weight: 600;
+        }
+        .btn-remove-row {
+            background: #EF4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            margin-left: 8px;
+        }
+        .btn-remove-row:hover { background: #DC2626; }
+        
+        .invoice-totals {
+            width: 320px;
+            margin-left: auto;
+            margin-bottom: 30px;
+        }
+        .invoice-totals-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .invoice-totals-row.subtotal { font-size: 15px; }
+        .invoice-totals-row.vat { font-size: 14px; color: #666; }
+        .invoice-totals-row.prepayment { font-size: 14px; color: #059669; }
+        .invoice-totals-row.grand-total {
+            background-color: #F5B72E;
+            margin: 0 -16px;
+            padding: 14px 16px;
+            border: none;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .totals-input {
+            text-align: right;
+            width: 140px;
+        }
+        
+        .signature-section { display: flex; justify-content: flex-end; margin-bottom: 30px; }
+        .signature-box { text-align: center; }
+        .signature-line { border-top: 2px solid #333; width: 150px; margin-top: 5px; padding-top: 8px; }
+        .signature-line p:first-child { font-weight: 600; font-size: 14px; }
+        .signature-line p:last-child { font-size: 12px; color: #666; margin-top: 2px; }
+        .invoice-footer-text {
+            background-color: #f8f8fc;
+            padding: 24px;
+            border-radius: 8px;
+            border-left: 4px solid #5B2D8E;
+        }
+        .invoice-footer-text p { margin: 0; color: #444; line-height: 1.8; font-size: 14px; }
+        .bank-details-input {
+            width: 100%;
+            font-weight: 600;
+        }
+        .invoice-bottom-bar {
+            background: linear-gradient(135deg, #F5B72E 0%, #E5A71E 100%);
+            padding: 16px 40px;
+            text-align: center;
+        }
+        .invoice-bottom-bar p { color: #1a1a2e; font-weight: 600; font-size: 14px; }
+        
+        /* Print/PDF styles */
+        @media print {
+            body { background: white; padding: 0; }
+            .preview-controls { display: none !important; }
+            .invoice-preview { box-shadow: none; }
+            .editable, .editable-input { border: none !important; background: transparent !important; }
+            .btn-remove-row { display: none !important; }
+        }
+        
+        /* Hide elements during PDF generation */
+        .generating-pdf .editable { border-color: transparent !important; background: transparent !important; }
+        .generating-pdf .editable-input { border-color: transparent !important; background: transparent !important; }
+        .generating-pdf .btn-remove-row { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="preview-controls">
+        <button class="btn-download" onclick="downloadPDF()">📥 Download PDF</button>
+        <button class="btn-add" onclick="addProductRow()">➕ Add Product Row</button>
+        <button class="btn-reset" onclick="resetInvoice()">🔄 New Invoice</button>
+        <div class="edit-mode-notice">
+            💡 Click any field to edit • All changes auto-calculate
+        </div>
+    </div>
+    
+    <div class="invoice-preview" id="invoicePreview">
+        <div class="invoice-header">
+            <svg viewBox="0 0 200 180" style="width: 120px; height: 100px;">
+                <rect width="200" height="180" fill="#5B2D8E"/>
+                <g transform="translate(50, 20)">
+                    <path d="M20 10 L90 10 L90 15 L25 15 L25 55 L80 55 L85 15 L90 15 L83 60 L20 60 Z" fill="#F5B72E" stroke="#F5B72E" stroke-width="3"/>
+                    <circle cx="35" cy="75" r="8" fill="#F5B72E"/>
+                    <circle cx="70" cy="75" r="8" fill="#F5B72E"/>
+                    <line x1="10" y1="5" x2="20" y2="10" stroke="#F5B72E" stroke-width="4"/>
+                </g>
+                <text x="100" y="130" text-anchor="middle" fill="#FFFFFF" font-family="Arial Black, sans-serif" font-size="24" font-weight="bold">Mall9ja</text>
+                <text x="100" y="150" text-anchor="middle" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="8" letter-spacing="2">SOMETHING FOR YOUR BUDGET</text>
+            </svg>
+            <div style="text-align: right; color: white;">
+                <h1>INVOICE</h1>
+                <input type="text" class="invoice-number-input" id="invoiceNumber" value="INV-0001" />
+            </div>
+        </div>
+        
+        <div class="invoice-body">
+            <div class="invoice-details">
+                <div>
+                    <h4>Bill To:</h4>
+                    <p class="name"><input type="text" class="editable-input" id="billToName" value="Customer Name" style="font-weight: 600; font-size: 16px; color: #333;" /></p>
+                    <p><input type="text" class="editable-input" id="billToEmail" value="customer@email.com" /></p>
+                    <p><input type="text" class="editable-input" id="billToPhone" value="Phone: 08012345678" /></p>
+                </div>
+                <div>
+                    <h4>Deliver To:</h4>
+                    <p><input type="text" class="editable-input" id="deliverToName" value="Delivery Address Line 1" /></p>
+                    <p><input type="text" class="editable-input" id="deliverToAddress" value="City, State" /></p>
+                    <p><input type="text" class="editable-input" id="deliverToPhone" value="Phone: 08012345678" /></p>
+                </div>
+                <div style="text-align: right;">
+                    <h4>Invoice Details:</h4>
+                    <p><strong>Date:</strong> <input type="text" class="editable-input" id="invoiceDate" value="January 13, 2026" style="width: 130px; text-align: right;" /></p>
+                    <p><strong>Due:</strong> <input type="text" class="editable-input" id="dueDate" value="January 20, 2026" style="width: 130px; text-align: right;" /></p>
+                    <p><strong>Ref:</strong> <input type="text" class="editable-input" id="reference" value="Sales Rep Name" style="width: 130px; text-align: right;" /></p>
+                </div>
+            </div>
+            
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody">
+                    <tr class="product-row">
+                        <td>
+                            <input type="text" class="editable-input product-name-input" value="Product Name" />
+                            <input type="text" class="editable-input product-desc-input" value="Product description goes here" />
+                        </td>
+                        <td><input type="number" class="editable-input qty-input" value="1" min="1" onchange="calculateTotals()" /></td>
+                        <td>
+                            <input type="text" class="editable-input amount-input" value="0.00" onchange="calculateTotals()" />
+                            <button class="btn-remove-row" onclick="removeProductRow(this)" title="Remove row">×</button>
+                        </td>
+                    </tr>
+                    <tr class="delivery-row">
+                        <td>
+                            <input type="text" class="editable-input product-name-input" value="Delivery Fee" />
+                            <input type="text" class="editable-input product-desc-input" value="Delivery & Assembly" />
+                        </td>
+                        <td style="color: #999;">—</td>
+                        <td>
+                            <input type="text" class="editable-input amount-input delivery-amount" value="0.00" onchange="calculateTotals()" />
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="invoice-totals">
+                <div class="invoice-totals-row subtotal">
+                    <span>Subtotal:</span>
+                    <span id="subtotalDisplay">₦0.00</span>
+                </div>
+                <div class="invoice-totals-row vat">
+                    <span>VAT (7.5%):</span>
+                    <span id="vatDisplay">₦0.00</span>
+                </div>
+                <div class="invoice-totals-row grand-total">
+                    <span>TOTAL:</span>
+                    <span id="totalDisplay">₦0.00</span>
+                </div>
+                <div class="invoice-totals-row prepayment">
+                    <span>Payment Received:</span>
+                    <input type="text" class="editable-input totals-input" id="prepaymentInput" value="0.00" onchange="calculateTotals()" style="color: #059669;" />
+                </div>
+            </div>
+            
+            <div class="signature-section">
+                <div class="signature-box">
+                    <svg viewBox="0 0 200 80" style="width: 150px; height: 60px;">
+                        <path d="M30 60 Q40 30 50 50 Q60 70 70 40 Q80 10 90 50 Q95 65 100 55 Q110 30 120 50 Q130 70 140 45 Q145 35 150 55 Q160 75 170 50" fill="none" stroke="#2D1B69" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M50 45 Q55 35 65 40 Q75 45 70 55 Q65 60 55 55 Q50 50 55 45" fill="none" stroke="#2D1B69" stroke-width="1.5"/>
+                        <path d="M85 30 Q95 20 100 35 Q105 50 95 45" fill="none" stroke="#2D1B69" stroke-width="1.5"/>
+                    </svg>
+                    <div class="signature-line">
+                        <p>Manager</p>
+                        <p>Mall9ja</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="invoice-footer-text">
+                <p><strong>Bank Details:</strong> <input type="text" class="editable-input bank-details-input" id="bankDetails" value="Access Bank | Account Name: House of Odin Ltd | Account Number: 0713322336" /></p>
+                <p style="margin-top: 12px;">Please accept this as a formal receipt for your purchase. We appreciate your patronage and look forward to serving you again in the future. If you have any questions or concerns, please don't hesitate to contact us. Thank you, and have a wonderful day!</p>
+            </div>
+        </div>
+        
+        <div class="invoice-bottom-bar">
+            <p>Mall9ja - Something For Your Budget | www.mall9ja.com</p>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set today's date
+            var today = new Date();
+            var options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('invoiceDate').value = today.toLocaleDateString('en-NG', options);
+            
+            // Set due date (7 days from now)
+            var dueDate = new Date(today);
+            dueDate.setDate(dueDate.getDate() + 7);
+            document.getElementById('dueDate').value = dueDate.toLocaleDateString('en-NG', options);
+            
+            // Load saved invoice number
+            var savedInvoiceNum = localStorage.getItem('mall9ja_invoice_number');
+            if (savedInvoiceNum) {
+                document.getElementById('invoiceNumber').value = savedInvoiceNum;
+            }
+            
+            calculateTotals();
+        });
+        
+        function formatCurrency(amount) {
+            return '₦' + Number(amount).toLocaleString('en-NG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        
+        function parseAmount(str) {
+            // Remove currency symbol and commas, then parse
+            var cleaned = str.replace(/[₦,\s]/g, '');
+            return parseFloat(cleaned) || 0;
+        }
+        
+        function calculateTotals() {
+            var subtotal = 0;
+            
+            // Sum all product amounts (including delivery)
+            document.querySelectorAll('.amount-input').forEach(function(input) {
+                subtotal += parseAmount(input.value);
+            });
+            
+            var vat = subtotal * 0.075;
+            var total = subtotal + vat;
+            
+            document.getElementById('subtotalDisplay').textContent = formatCurrency(subtotal);
+            document.getElementById('vatDisplay').textContent = formatCurrency(vat);
+            document.getElementById('totalDisplay').textContent = formatCurrency(total);
+        }
+        
+        function addProductRow() {
+            var tbody = document.getElementById('productTableBody');
+            var deliveryRow = tbody.querySelector('.delivery-row');
+            
+            var newRow = document.createElement('tr');
+            newRow.className = 'product-row';
+            newRow.innerHTML = `
+                <td>
+                    <input type="text" class="editable-input product-name-input" value="Product Name" />
+                    <input type="text" class="editable-input product-desc-input" value="Description" />
+                </td>
+                <td><input type="number" class="editable-input qty-input" value="1" min="1" onchange="calculateTotals()" /></td>
+                <td>
+                    <input type="text" class="editable-input amount-input" value="0.00" onchange="calculateTotals()" />
+                    <button class="btn-remove-row" onclick="removeProductRow(this)" title="Remove row">×</button>
+                </td>
+            `;
+            
+            // Insert before delivery row
+            tbody.insertBefore(newRow, deliveryRow);
+        }
+        
+        function removeProductRow(btn) {
+            var rows = document.querySelectorAll('.product-row');
+            if (rows.length > 1) {
+                btn.closest('tr').remove();
+                calculateTotals();
+            } else {
+                alert('You need at least one product row');
+            }
+        }
+        
+        function incrementInvoiceNumber() {
+            var currentNum = document.getElementById('invoiceNumber').value;
+            var match = currentNum.match(/(\d+)/);
+            if (match) {
+                var num = parseInt(match[1]) + 1;
+                var prefix = currentNum.replace(/\d+/, '');
+                var newNum = prefix + String(num).padStart(match[1].length, '0');
+                document.getElementById('invoiceNumber').value = newNum;
+                localStorage.setItem('mall9ja_invoice_number', newNum);
+                return newNum;
+            }
+            return currentNum;
+        }
+        
+        function resetInvoice() {
+            if (confirm('Start a new invoice? This will clear all fields and increment the invoice number.')) {
+                // Increment invoice number
+                incrementInvoiceNumber();
+                
+                // Reset dates
+                var today = new Date();
+                var options = { year: 'numeric', month: 'long', day: 'numeric' };
+                document.getElementById('invoiceDate').value = today.toLocaleDateString('en-NG', options);
+                var dueDate = new Date(today);
+                dueDate.setDate(dueDate.getDate() + 7);
+                document.getElementById('dueDate').value = dueDate.toLocaleDateString('en-NG', options);
+                
+                // Reset customer info
+                document.getElementById('billToName').value = 'Customer Name';
+                document.getElementById('billToEmail').value = 'customer@email.com';
+                document.getElementById('billToPhone').value = 'Phone: 08012345678';
+                document.getElementById('deliverToName').value = 'Delivery Address Line 1';
+                document.getElementById('deliverToAddress').value = 'City, State';
+                document.getElementById('deliverToPhone').value = 'Phone: 08012345678';
+                document.getElementById('reference').value = 'Sales Rep Name';
+                
+                // Reset products table
+                document.getElementById('productTableBody').innerHTML = `
+                    <tr class="product-row">
+                        <td>
+                            <input type="text" class="editable-input product-name-input" value="Product Name" />
+                            <input type="text" class="editable-input product-desc-input" value="Product description goes here" />
+                        </td>
+                        <td><input type="number" class="editable-input qty-input" value="1" min="1" onchange="calculateTotals()" /></td>
+                        <td>
+                            <input type="text" class="editable-input amount-input" value="0.00" onchange="calculateTotals()" />
+                            <button class="btn-remove-row" onclick="removeProductRow(this)" title="Remove row">×</button>
+                        </td>
+                    </tr>
+                    <tr class="delivery-row">
+                        <td>
+                            <input type="text" class="editable-input product-name-input" value="Delivery Fee" />
+                            <input type="text" class="editable-input product-desc-input" value="Delivery & Assembly" />
+                        </td>
+                        <td style="color: #999;">—</td>
+                        <td>
+                            <input type="text" class="editable-input amount-input delivery-amount" value="0.00" onchange="calculateTotals()" />
+                        </td>
+                    </tr>
+                `;
+                
+                // Reset prepayment
+                document.getElementById('prepaymentInput').value = '0.00';
+                
+                calculateTotals();
+            }
+        }
+        
+        function downloadPDF() {
+            var element = document.getElementById('invoicePreview');
+            var invoiceNum = document.getElementById('invoiceNumber').value;
+            
+            // Add class to hide edit indicators
+            element.classList.add('generating-pdf');
+            
+            var opt = {
+                margin: 0,
+                filename: invoiceNum + '.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            html2pdf().set(opt).from(element).save().then(function() {
+                element.classList.remove('generating-pdf');
+                // Save current invoice number for next time
+                localStorage.setItem('mall9ja_invoice_number', invoiceNum);
+            });
+        }
+    </script>
+</body>
+</html>
